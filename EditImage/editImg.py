@@ -32,7 +32,7 @@ def vintageEdit(pathIn,pathOut):
     img = Image.merge("RGB", (r, g, b))
     
     # Step 2: Add a slight blur
-    img = img.filter(ImageFilter.GaussianBlur(1))
+    img = img.filter(ImageFilter.GaussianBlur(0.4))
     
     # Step 3: Add film grain using NumPy
     np_img = np.array(img)
@@ -59,10 +59,7 @@ def vintageEdit(pathIn,pathOut):
     # Save the edited image
     img.save(pathOut)
     print(f"Edited image saved to {pathOut}")
-
-
-# def processImages(pathIn,pathOut):
-    
+   
 
 '''
 ///////////////
@@ -135,4 +132,5 @@ def checkDirectory(pathOut):
     if not os.path.exists(pathOut):
         os.makedirs(pathOut)
 
-vintage_edit(pathIn,pathOut)
+# vintageEdit(pathIn,pathOut)
+editBatch(pathIn,pathOut)
