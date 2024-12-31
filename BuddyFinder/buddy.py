@@ -1,6 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from time import sleep
 from dotenv import load_dotenv
 import os
@@ -107,12 +108,44 @@ class BuddyBot():
             # continue_btn5 = self.driver.find_element("xpath","/html/body/div/div/div[1]/main/div[2]/div/div/span/div/section/div/div[3]/button")
             # continue_btn5.click()
             ##########################
-            for i in range(10):
-                like_button = self.driver.find_element("xpath","/html/body/div/div/div[1]/main/div[2]/div/div/span/div[2]/div/div[2]/div/div[2]/div/div[1]/span")
-                like_button.click()
-                sleep(2)
+            # self.driver.maximize_window(main_window)
 
-            sleep(2)
+            for _ in range(3):
+                try:
+                    # Locate the age element
+                    get_age = self.driver.find_element(By.XPATH, "/html/body/div/div/div[1]/main/div[2]/div/div/span/div[1]/article/div[1]/div[1]/article/div[2]/section/header/h1/span[2]")
+                    age_text = get_age.text.strip()  # Remove any leading/trailing whitespace
+                    age_text = ''.join(filter(str.isdigit, age_text))  # Extract only digits
+
+                    sleep(2)
+
+                    # Perform scrolling down actions
+                    for _ in range(5):
+                        try:
+                            # Simulate the DOWN key
+                            self.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.ARROW_DOWN)
+                            sleep(2)
+                        except Exception as e:
+                            print(f"Error during scrolling: {e}")
+                    
+                    if age_text:  # Check if the age_text is not empty
+                        age = int(age_text)  # Convert to an integer
+                        print(f"Age: {age}")
+
+                        # Check if the age is within the desired range
+                        if age >= 19 and age <= 26:
+                            like_button = self.driver.find_element(By.XPATH, "/html/body/div/div/div[1]/main/div[2]/div/div/span/div[2]/div/div[2]/div/div[3]/div/div[1]/span")
+                            like_button.click()
+                            print(f"Age {age} is within the range.")
+                        else:
+                            dislike_button = self.driver.find_element(By.XPATH, "/html/body/div/div/div[1]/main/div[2]/div/div/span/div[2]/div/div[2]/div/div[1]/div/div[1]/span")
+                            dislike_button.click()
+                            print(f"Age {age} is out of the desired range.")
+
+                except Exception as e:
+                    print(f"Error locating or parsing age: {e}")
+
+                sleep(2)
 
             self.quit_browser()
 
