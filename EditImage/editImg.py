@@ -22,15 +22,46 @@ input images are located. These images will be processed by the `vintageEdit` fu
 :param pathOut: The `pathOut` parameter in the `editBatch` function is the directory path where the
 edited images will be saved after processing
 '''
-def editBatch(pathIn,pathOut):
+def editBatch(pathIn,pathOut,t):
     checkDirectory(pathOut)
     
     for filename in os.listdir(pathIn):
         if filename.endswith((".jpg", ".png")):
-            input_path = os.path.join(pathIn, filename)
-            output_path = os.path.join(pathOut, filename)
-            vintageEdit(input_path, output_path)
-            # drawingEdit(pathIn,pathOut)
+            inputPath = os.path.join(pathIn, filename)
+            outputPath = os.path.join(pathOut, filename)
+            selectEdit(inputPath,outputPath,t)
+            print(f"Edited image saved to {pathOut}")
+
+def cinematicEdit(pathIn,pathOut):
+    #--------------------------------------#
+    img = Image.open(pathIn).convert("RGB")
+    #--------------------------------------#
+    r, g, b = img.split()
+    r = adjustChannel(r, 1.1)
+    g = adjustChannel(g, 1.01)
+    b = adjustChannel(b, 0.9)
+    img = Image.merge("RGB", (r, g, b))
+    #--------------------------------------# 
+    enhancer = ImageEnhance.Color(img)
+    img = enhancer.enhance(1.3) 
+    enhancer = ImageEnhance.Contrast(img)
+    img = enhancer.enhance(1.5)
+    #--------------------------------------# 
+    img = img.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
+    #--------------------------------------# 
+    np_img = np.array(img)
+    rows, cols = np_img.shape[:2]
+    kernel_x = cv2.getGaussianKernel(cols, cols // 3)
+    kernel_y = cv2.getGaussianKernel(rows, rows // 3)
+    kernel = kernel_y * kernel_x.T
+    vignette = 255 * kernel / np.linalg.norm(kernel)
+    vignette = np.dstack((vignette, vignette, vignette))
+    np_img = cv2.addWeighted(np_img, 0.8, vignette.astype(np.uint8), 0.2, 0)
+    img = Image.fromarray(np.clip(np_img, 0, 255).astype(np.uint8))
+    #--------------------------------------# 
+    img = ImageOps.expand(img, border=(0, img.height // 6), fill="black")
+    #--------------------------------------# 
+    img.save(pathOut)
 
 """
 ///////////////
@@ -96,31 +127,6 @@ def vintageEdit(pathIn,pathOut):
     img = img.filter(ImageFilter.UnsharpMask(radius=3, percent=150, threshold=3))
     #----------------------------------------#
     img.save(pathOut)
-    print(f"Edited image saved to {pathOut}")
-   
-"""
-The function `adjustChannel` takes an image channel and a factor, multiplies each pixel value by
-the factor, and returns the adjusted channel.
-
-:param channel: The `channel` parameter in the `adjust_channel` function likely refers to an image
-channel, such as the red, green, or blue channel of an image. In image processing, an image is
-typically composed of multiple channels, each representing different color information
-
-:param factor: The `factor` parameter in the `adjust_channel` function represents the value by which
-each pixel in the channel will be multiplied to adjust its intensity or brightness. This factor can
-be used to make the channel brighter (if factor > 1), darker (if 0 < factor < 1),
-
-:return: The function `adjustChannel` is returning an adjusted channel with the pixel values
-multiplied by the factor provided as an argument.
-"""
-def adjustChannel(channel, factor):
-    adjusted_pixels = []
-    for pixel in channel.getdata():
-        prod = int(pixel * factor)
-        adjusted_pixels.append(prod)
-    adjusted_channel = channel.copy()
-    adjusted_channel.putdata(adjusted_pixels)
-    return adjusted_channel
 
 '''
 ///////////////
@@ -158,30 +164,59 @@ look of pencil sketches, where dark outlines stand out against a lighter backgro
 - Lastly, we apply sharpening: To make the lines more defined and emphasize the edges even further, we apply a sharpening filter. This gives the sketch its final polished look, with crisp and clear lines that stand out.
 '''
 def drawingEdit(pathIn,pathOut):
-    for filename in os.listdir(pathIn):
-        curr_file_path = os.path.join(pathIn, filename)
+    try:
+        with Image.open(pathIn) as img:
+            img = img.convert("L")
+            img = img.filter(ImageFilter.GaussianBlur(radius=0.55))
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(1.95)
+            enhancer = ImageEnhance.Brightness(img)
+            img = enhancer.enhance(0.80)
+            img_cv = np.array(img)
+            edges = cv2.Canny(img_cv, 100, 200)
+            edges_img = Image.fromarray(edges)
+            edges_img = ImageOps.invert(edges_img)
+            img = Image.blend(img.convert("RGB"), edges_img.convert("RGB"), alpha=0.4)
 
-        try:
-            with Image.open(curr_file_path) as img:
-                img = img.convert("L")
-                img = img.filter(ImageFilter.GaussianBlur(radius=0.55))
-                enhancer = ImageEnhance.Contrast(img)
-                img = enhancer.enhance(1.95)
-                enhancer = ImageEnhance.Brightness(img)
-                img = enhancer.enhance(0.80)
-                img_cv = np.array(img)
-                edges = cv2.Canny(img_cv, 100, 200)
-                edges_img = Image.fromarray(edges)
-                edges_img = ImageOps.invert(edges_img)
-                img = Image.blend(img.convert("RGB"), edges_img.convert("RGB"), alpha=0.4)
+            for _ in range(2):
+                img = img.filter(ImageFilter.SHARPEN)
 
-                for _ in range(2):
-                    img = img.filter(ImageFilter.SHARPEN)
-                img.save(os.path.join(pathOut, filename))
-                print(f"Edited {filename}")
-                 #-----------------------------------------#
-        except:
-            print(f"Error processing {filename}")
+            img.save(pathOut)
+                #-----------------------------------------#
+    except:
+        print(f"Error processing {pathIn}")
+ 
+def selectEdit(inputPath,outputPath,t):
+    if t == 'c':
+        cinematicEdit(inputPath,outputPath)
+    elif t == 'v':
+        vintageEdit(inputPath,outputPath)
+    elif t == 'd':
+        drawingEdit(inputPath,outputPath)
+
+"""
+The function `adjustChannel` takes an image channel and a factor, multiplies each pixel value by
+the factor, and returns the adjusted channel.
+
+:param channel: The `channel` parameter in the `adjust_channel` function likely refers to an image
+channel, such as the red, green, or blue channel of an image. In image processing, an image is
+typically composed of multiple channels, each representing different color information
+
+:param factor: The `factor` parameter in the `adjust_channel` function represents the value by which
+each pixel in the channel will be multiplied to adjust its intensity or brightness. This factor can
+be used to make the channel brighter (if factor > 1), darker (if 0 < factor < 1),
+
+:return: The function `adjustChannel` is returning an adjusted channel with the pixel values
+multiplied by the factor provided as an argument.
+"""
+def adjustChannel(channel, factor):
+    adjusted_pixels = []
+    for pixel in channel.getdata():
+        prod = int(pixel * factor)
+        adjusted_pixels.append(prod)
+    adjusted_channel = channel.copy()
+    adjusted_channel.putdata(adjusted_pixels)
+    return adjusted_channel
 
 '''
 This function takes two parameters: pathIn and pathOut.
@@ -192,4 +227,30 @@ def checkDirectory(pathOut):
     if not os.path.exists(pathOut):
         os.makedirs(pathOut)
 
-editBatch(pathIn,pathOut)
+def startEditing():
+    print("""
+    ****************************************
+    *        Welcome to Image Editor       *
+    ****************************************
+    """)
+    input("Press Enter to start the image editing process...\n")
+    
+    print("""
+    ----------------------------------------
+    Select the type of edit you want to apply:
+    1. Drawing     [Enter 'd']
+    2. Vintage     [Enter 'v']
+    3. Cinematic   [Enter 'c']
+    ----------------------------------------
+    """)
+    
+    typeEdit = input("> Please enter your choice: ").strip().lower()
+    
+    while typeEdit not in ['d', 'v', 'c']:
+        print("\nInvalid choice. Please select one of the following options: d, v, c.")
+        typeEdit = input("> Please enter your choice: ").strip().lower()
+    
+    return typeEdit
+
+editType = startEditing()
+editBatch(pathIn,pathOut, editType)
