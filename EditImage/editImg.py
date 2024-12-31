@@ -227,4 +227,30 @@ def checkDirectory(pathOut):
     if not os.path.exists(pathOut):
         os.makedirs(pathOut)
 
-vintage_edit(pathIn,pathOut)
+def startEditing():
+    print("""
+    ****************************************
+    *        Welcome to Image Editor       *
+    ****************************************
+    """)
+    input("Press Enter to start the image editing process...\n")
+    
+    print("""
+    ----------------------------------------
+    Select the type of edit you want to apply:
+    1. Drawing     [Enter 'd']
+    2. Vintage     [Enter 'v']
+    3. Cinematic   [Enter 'c']
+    ----------------------------------------
+    """)
+    
+    typeEdit = input("> Please enter your choice: ").strip().lower()
+    
+    while typeEdit not in ['d', 'v', 'c']:
+        print("\nInvalid choice. Please select one of the following options: d, v, c.")
+        typeEdit = input("> Please enter your choice: ").strip().lower()
+    
+    return typeEdit
+
+editType = startEditing()
+editBatch(pathIn,pathOut, editType)
