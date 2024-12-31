@@ -2,7 +2,6 @@ from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 import numpy as np
 import os
 import cv2
-import random
 
 # Input Images Dir
 pathIn = os.path.join(os.getcwd(), "inputImgs")
@@ -10,59 +9,124 @@ pathIn = os.path.join(os.getcwd(), "inputImgs")
 # Edited Images Dir
 pathOut = os.path.join(os.getcwd(), "editedImgs")
 
-def editBatch(pathIn,pathOut):
+'''
+///////////
+editBatch//
+///////////
+
+The function `editBatch` processes image files in a specified input directory and applies a vintage
+edit before saving the edited images to an output directory.
+
+:param pathIn: The `pathIn` parameter in the `editBatch` function is the directory path where the
+input images are located. These images will be processed by the `vintageEdit` function
+:param pathOut: The `pathOut` parameter in the `editBatch` function is the directory path where the
+edited images will be saved after processing
+'''
+def editBatch(pathIn,pathOut,t):
     checkDirectory(pathOut)
     
     for filename in os.listdir(pathIn):
         if filename.endswith((".jpg", ".png")):
-            input_path = os.path.join(pathIn, filename)
-            output_path = os.path.join(pathOut, filename)
-            vintageEdit(input_path, output_path)
-            # drawingEdit(pathIn,pathOut)
+            inputPath = os.path.join(pathIn, filename)
+            outputPath = os.path.join(pathOut, filename)
+            selectEdit(inputPath,outputPath,t)
+            print(f"Edited image saved to {pathOut}")
 
-def vintageEdit(pathIn,pathOut):
-    # Open the image
+def cinematicEdit(pathIn,pathOut):
+    #--------------------------------------#
     img = Image.open(pathIn).convert("RGB")
-    
-    # Step 1: Apply warm color grading
+    #--------------------------------------#
     r, g, b = img.split()
-    r = r.point(lambda i: i * 1.2)  # Increase red tones
-    g = g.point(lambda i: i * 1.1)  # Slightly increase green
-    b = b.point(lambda i: i * 0.9)  # Reduce blue for a warmer feel
+    r = adjustChannel(r, 1.1)
+    g = adjustChannel(g, 1.01)
+    b = adjustChannel(b, 0.9)
     img = Image.merge("RGB", (r, g, b))
-    
-    # Step 2: Add a slight blur
-    img = img.filter(ImageFilter.GaussianBlur(1))
-    
-    # Step 3: Add film grain using NumPy
-    np_img = np.array(img)
-    noise = np.random.normal(0, 10, np_img.shape)  # Gaussian noise
-    np_img = np.clip(np_img + noise, 0, 255).astype(np.uint8)
-    img = Image.fromarray(np_img)
-    
-    # Step 4: Adjust brightness and contrast
-    enhancer = ImageEnhance.Brightness(img)
-    img = enhancer.enhance(1.1)  # Slightly brighten
+    #--------------------------------------# 
+    enhancer = ImageEnhance.Color(img)
+    img = enhancer.enhance(1.3) 
     enhancer = ImageEnhance.Contrast(img)
-    img = enhancer.enhance(1.2)  # Increase contrast
-    
-    # Step 5: Add vignette using OpenCV
+    img = enhancer.enhance(1.5)
+    #--------------------------------------# 
+    img = img.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
+    #--------------------------------------# 
+    np_img = np.array(img)
     rows, cols = np_img.shape[:2]
     kernel_x = cv2.getGaussianKernel(cols, cols // 3)
     kernel_y = cv2.getGaussianKernel(rows, rows // 3)
     kernel = kernel_y * kernel_x.T
-    mask = 255 * kernel / np.linalg.norm(kernel)
-    vignette = np.dstack((mask, mask, mask))
-    np_img = cv2.addWeighted(np_img, 0.7, vignette.astype(np.uint8), 0.3, 0)
-    img = Image.fromarray(np_img)
-    
-    # Save the edited image
+    vignette = 255 * kernel / np.linalg.norm(kernel)
+    vignette = np.dstack((vignette, vignette, vignette))
+    np_img = cv2.addWeighted(np_img, 0.8, vignette.astype(np.uint8), 0.2, 0)
+    img = Image.fromarray(np.clip(np_img, 0, 255).astype(np.uint8))
+    #--------------------------------------# 
+    img = ImageOps.expand(img, border=(0, img.height // 6), fill="black")
+    #--------------------------------------# 
     img.save(pathOut)
-    print(f"Edited image saved to {pathOut}")
 
+"""
+///////////////
+Vintage Edit //
+///////////////
 
-# def processImages(pathIn,pathOut):
-    
+Purpose:
+Applies a "vintage" effect to an image by manipulating its color channels, 
+adding noise, adjusting brightness and contrast, and overlaying a vignette filter.
+The processed image is then saved to a specified output path.
+
+Explanation:
+- Input Image Conversion: The function begins by opening the input image file and 
+converting it to the RGB color mode.
+
+- Color Adjustment: The red, green, and blue channels are individually 
+adjusted to enhance red tones, slightly increase green, and reduce blue for a warmer effect.
+
+- Blurring: A Gaussian blur is applied to soften the image slightly.
+
+- Noise Addition: Random noise is introduced to simulate an aged or
+"vintage" texture, with pixel values clipped to valid ranges.
+
+- Brightness & Contrast Enhancement: The brightness is increased by 10%, 
+and the contrast by 20% for more vivid colors.
+
+- Vignette Effect: A Gaussian kernel is used to generate a vignette mask, 
+which darkens the image edges for a classic look.
+
+- Save Processed Image: The final processed image is saved to the specified
+output path, and the file path is printed for confirmation.
+"""
+def vintageEdit(pathIn,pathOut):
+    #--------------------------------------#
+    img = Image.open(pathIn).convert("RGB")
+    #--------------------------------------#
+    r, g, b = img.split()
+    r = adjustChannel(r, 1.2)
+    g = adjustChannel(g, 1.1)
+    b = adjustChannel(b, 0.9)
+    img = Image.merge("RGB", (r, g, b))
+    #--------------------------------------#
+    img = img.filter(ImageFilter.GaussianBlur(0.3))
+    #--------------------------------------#
+    np_img = np.array(img)
+    noise = np.random.normal(0, 3, np_img.shape) 
+    np_img = np.clip(np_img + noise, 0, 255).astype(np.uint8)
+    img = Image.fromarray(np_img)
+    #--------------------------------------#
+    enhancer = ImageEnhance.Brightness(img)
+    img = enhancer.enhance(1.05) 
+    enhancer = ImageEnhance.Contrast(img)
+    img = enhancer.enhance(1.2)
+    #--------------------------------------#
+    rows, cols = np_img.shape[:2]
+    kernel_x = cv2.getGaussianKernel(cols, cols // 5)
+    kernel_y = cv2.getGaussianKernel(rows, rows // 5)
+    kernel = kernel_y * kernel_x.T
+    mask = 180 * kernel / np.linalg.norm(kernel)
+    vignette = np.dstack((mask, mask, mask))
+    np_img = cv2.addWeighted(np_img, 0.7, vignette.astype(np.uint8), 0.35, 0)
+    img = Image.fromarray(np_img)
+    img = img.filter(ImageFilter.UnsharpMask(radius=3, percent=150, threshold=3))
+    #----------------------------------------#
+    img.save(pathOut)
 
 '''
 ///////////////
@@ -70,8 +134,7 @@ Drawing Edit //
 ///////////////
 
 Purpose:
-Explanation: 
-Drawing Edit Purpose: This function transforms input images into hand-drawn, pencil-sketch-like pictures, using a series of image-processing steps. It creates a unique, artistic effect that highlights key features and emphasizes lines, mimicking the look of a hand-drawn sketch.
+- This function transforms input images into hand-drawn, pencil-sketch-like pictures, using a series of image-processing steps. It creates a unique, artistic effect that highlights key features and emphasizes lines, mimicking the look of a hand-drawn sketch.
 
 Explanation:
 - First, we convert the image to grayscale.
@@ -101,30 +164,59 @@ look of pencil sketches, where dark outlines stand out against a lighter backgro
 - Lastly, we apply sharpening: To make the lines more defined and emphasize the edges even further, we apply a sharpening filter. This gives the sketch its final polished look, with crisp and clear lines that stand out.
 '''
 def drawingEdit(pathIn,pathOut):
-    for filename in os.listdir(pathIn):
-        curr_file_path = os.path.join(pathIn, filename)
+    try:
+        with Image.open(pathIn) as img:
+            img = img.convert("L")
+            img = img.filter(ImageFilter.GaussianBlur(radius=0.55))
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(1.95)
+            enhancer = ImageEnhance.Brightness(img)
+            img = enhancer.enhance(0.80)
+            img_cv = np.array(img)
+            edges = cv2.Canny(img_cv, 100, 200)
+            edges_img = Image.fromarray(edges)
+            edges_img = ImageOps.invert(edges_img)
+            img = Image.blend(img.convert("RGB"), edges_img.convert("RGB"), alpha=0.4)
 
-        try:
-            with Image.open(curr_file_path) as img:
-                img = img.convert("L")
-                img = img.filter(ImageFilter.GaussianBlur(radius=0.55))
-                enhancer = ImageEnhance.Contrast(img)
-                img = enhancer.enhance(1.95)
-                enhancer = ImageEnhance.Brightness(img)
-                img = enhancer.enhance(0.80)
-                img_cv = np.array(img)
-                edges = cv2.Canny(img_cv, 100, 200)
-                edges_img = Image.fromarray(edges)
-                edges_img = ImageOps.invert(edges_img)
-                img = Image.blend(img.convert("RGB"), edges_img.convert("RGB"), alpha=0.4)
+            for _ in range(2):
+                img = img.filter(ImageFilter.SHARPEN)
 
-                for _ in range(2):
-                    img = img.filter(ImageFilter.SHARPEN)
-                img.save(os.path.join(pathOut, filename))
-                print(f"Edited {filename}")
-                 #-----------------------------------------#
-        except:
-            print(f"Error processing {filename}")
+            img.save(pathOut)
+                #-----------------------------------------#
+    except:
+        print(f"Error processing {pathIn}")
+ 
+def selectEdit(inputPath,outputPath,t):
+    if t == 'c':
+        cinematicEdit(inputPath,outputPath)
+    elif t == 'v':
+        vintageEdit(inputPath,outputPath)
+    elif t == 'd':
+        drawingEdit(inputPath,outputPath)
+
+"""
+The function `adjustChannel` takes an image channel and a factor, multiplies each pixel value by
+the factor, and returns the adjusted channel.
+
+:param channel: The `channel` parameter in the `adjust_channel` function likely refers to an image
+channel, such as the red, green, or blue channel of an image. In image processing, an image is
+typically composed of multiple channels, each representing different color information
+
+:param factor: The `factor` parameter in the `adjust_channel` function represents the value by which
+each pixel in the channel will be multiplied to adjust its intensity or brightness. This factor can
+be used to make the channel brighter (if factor > 1), darker (if 0 < factor < 1),
+
+:return: The function `adjustChannel` is returning an adjusted channel with the pixel values
+multiplied by the factor provided as an argument.
+"""
+def adjustChannel(channel, factor):
+    adjusted_pixels = []
+    for pixel in channel.getdata():
+        prod = int(pixel * factor)
+        adjusted_pixels.append(prod)
+    adjusted_channel = channel.copy()
+    adjusted_channel.putdata(adjusted_pixels)
+    return adjusted_channel
 
 '''
 This function takes two parameters: pathIn and pathOut.
@@ -135,4 +227,4 @@ def checkDirectory(pathOut):
     if not os.path.exists(pathOut):
         os.makedirs(pathOut)
 
-# vintage_edit(pathIn,pathOut)
+vintage_edit(pathIn,pathOut)
